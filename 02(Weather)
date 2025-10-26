@@ -1,0 +1,61 @@
+# Install necessary libraries (only needed in Colab)
+!pip install requests matplotlib seaborn
+
+
+import requests
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+# Your OpenWeatherMap API key here
+API_KEY ='389845a1152038fb5f02c4023210a487'  # <-- Replace with your actual API key
+
+
+# Location coordinates (example: New York City)
+latitude = 40.7128
+longitude = -74.0060
+
+
+# API URL with units=metric for Celsius
+url = f"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={API_KEY}&units=metric"
+
+
+# Call the API
+response = requests.get(url)
+data = response.json()
+
+
+# Check if request was successful
+if response.status_code == 200:
+    # Extract key weather info
+    temp = data['main']['temp']
+    temp_min = data['main']['temp_min']
+    temp_max = data['main']['temp_max']
+    humidity = data['main']['humidity']
+    wind_speed = data['wind']['speed']
+    weather_desc = data['weather'][0]['description']
+
+
+    # Print weather info
+    print(f"Weather in location ({latitude}, {longitude}):")
+    print(f"Description: {weather_desc}")
+    print(f"Temperature: {temp}°C (min: {temp_min}°C, max: {temp_max}°C)")
+    print(f"Humidity: {humidity}%")
+    print(f"Wind Speed: {wind_speed} m/s")
+
+
+    # Visualization
+    attributes = ['Temperature (°C)', 'Humidity (%)', 'Wind Speed (m/s)']
+    values = [temp, humidity, wind_speed]
+
+
+    plt.figure(figsize=(8,5))
+    sns.barplot(x=attributes, y=values, palette='coolwarm')
+    plt.title('Current Weather Attributes')
+    plt.ylim(0, max(values)*1.2)
+    plt.show()
+
+
+else:
+    print("Failed to retrieve data. Error code:", response.status_code)
+    print("Message:", data.get("message", "No message available"))

@@ -1,0 +1,171 @@
+# Install necessary package
+!pip install openpyxl
+
+
+# Imports
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from google.colab import files
+
+
+# Upload files
+print("Please upload your sales data files (CSV, Excel, JSON):")
+uploaded = files.upload()
+
+
+# Automatically detect uploaded files by extension
+csv_file = None
+excel_file = None
+json_file = None
+
+
+for filename in uploaded.keys():
+    if filename.endswith('.csv'):
+        csv_file = filename
+    elif filename.endswith(('.xls', '.xlsx')):
+        excel_file = filename
+    elif filename.endswith('.json'):
+        json_file = filename
+
+
+print(f"CSV file detected: {csv_file}")
+print(f"Excel file detected: {excel_file}")
+print(f"JSON file detected: {json_file}")
+
+
+# Load files into DataFrames
+df_csv = pd.read_csv(csv_file, encoding='latin1') if csv_file else pd.DataFrame()
+df_excel = pd.read_excel(excel_file) if excel_file else pd.DataFrame()
+df_json = pd.read_json(json_file) if json_file else pd.DataFrame()
+
+
+# Function to explore data
+def explore_data(df, name='DataFrame'):
+    print(f"\n--- {name} info ---")
+    print(df.info())
+    print(f"\n--- {name} head ---")
+    print(df.head())
+    print(f"\n--- {name} missing values ---")
+    print(df.isnull().sum())
+    print(f"\n--- {name} duplicates --- {df.duplicated().sum()}")
+
+
+# Explore all datasets
+if not df_csv.empty: explore_data(df_csv, 'CSV Data')
+if not df_excel.empty: explore_data(df_excel, 'Excel Data')
+if not df_json.empty: explore_data(df_json, 'JSON Data')
+
+
+# Function to clean data
+def clean_data(df):
+    if df.empty:
+        return df
+    # Drop duplicates
+    df = df.drop_duplicates().copy()
+   
+    # Fill missing numeric with 0, categorical with mode
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            df[col] = df[col].fillna(0)
+        else:
+            if not df[col].mode().empty:
+                df[col] = df[col].fillna(df[col].mode()[0])
+            else:
+                df[col] = df[col].fillna('Unknown')
+    return df
+
+
+# Clean all datasets
+df_csv_clean = clean_data(df_csv)
+df_excel_clean = clean_data(df_excel)
+df_json_clean = clean_data(df_json)
+
+
+# Unify columns before concatenation
+# Find all columns used across datasets
+all_cols = set(df_csv_clean.columns).union(set(df_excel_clean.columns)).union(set(df_json_clean.columns))
+
+
+# Make sure all DataFrames have all columns
+def align_columns(df, all_cols):
+    for col in all_cols:
+        if col not in df.columns:
+            df[col] = np.nan  # fill missing columns with NaN
+    return df[sorted(all_cols)]
+
+
+df_csv_aligned = align_columns(df_csv_clean, all_cols)
+df_excel_aligned = align_columns(df_excel_clean, all_cols)
+df_json_aligned = align_columns(df_json_clean, all_cols)
+
+
+# Concatenate all data
+df_all = pd.concat([df_csv_aligned, df_excel_aligned, df_json_aligned], ignore_index=True)
+
+
+print("\n--- Combined DataFrame info ---")
+print(df_all.info())
+
+
+# Example data transformation: create 'Total_Sales' if 'Quantity' and 'Price' exist
+if 'Quantity' in df_all.columns and 'Price' in df_all.columns:
+    df_all['Total_Sales'] = df_all['Quantity'].astype(float) * df_all['Price'].astype(float)
+else:
+    print("Columns 'Quantity' and/or 'Price' missing, skipping 'Total_Sales' calculation.")
+
+
+# Example descriptive statistics
+print("\n--- Descriptive Statistics ---")
+if 'Total_Sales' in df_all.columns:
+    total_sales = df_all['Total_Sales'].sum()
+    print(f"Total Sales: {total_sales}")
+
+
+if 'OrderID' in df_all.columns and 'Total_Sales' in df_all.columns:
+    avg_order_value = df_all.groupby('OrderID')['Total_Sales'].sum().mean()
+    print(f"Average Order Value: {avg_order_value}")
+
+
+if 'Product_Category' in df_all.columns:
+    print("\nProduct Category Distribution:")
+    print(df_all['Product_Category'].value_counts())
+
+
+# Visualizations
+sns.set(style="whitegrid")
+
+
+# Total Sales by Product Category (bar plot)
+if 'Product_Category' in df_all.columns and 'Total_Sales' in df_all.columns:
+    plt.figure(figsize=(10,6))
+    sns.barplot(data=df_all, x='Product_Category', y='Total_Sales', estimator=sum, ci=None)
+    plt.title('Total Sales by Product Category')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+# Pie chart of Product Category distribution
+if 'Product_Category' in df_all.columns:
+    plt.figure(figsize=(6,6))
+    df_all['Product_Category'].value_counts().plot.pie(autopct='%1.1f%%')
+    plt.title('Product Category Distribution')
+    plt.ylabel('')
+    plt.show()
+
+
+# Boxplot of Total Sales
+if 'Total_Sales' in df_all.columns:
+    plt.figure(figsize=(8,5))
+    sns.boxplot(x=df_all['Total_Sales'])
+    plt.title('Distribution of Total Sales')
+    plt.show()
+
+
+print("\nAnalysis complete!")
+
+
+
+"https://www.kaggle.com/datasets/kyanyoga/sample-sales-data?resource=download"
